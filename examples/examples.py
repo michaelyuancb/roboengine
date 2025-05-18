@@ -11,7 +11,7 @@ from robo_engine.infer_engine import RoboEngineAugmentation
 def write_video(image_np, video_fp, fps):
     value_max = np.max(image_np) 
     if value_max <= 1.0 + 1e-5:
-        image_vis_scale = 255.0 
+        image_vis_scale = 255.0
     else:
         image_vis_scale = 1.0
     writer = imageio.get_writer(video_fp, fps=fps, format="ffmpeg")
@@ -41,6 +41,7 @@ def image_example(image_fp, prompt_image, engine_robo_seg, engine_obj_seg, engin
 def video_example(video_fp, prompt_video, engine_robo_seg, engine_obj_seg, engine_bg_aug, video_anchor_frequency=8):
     video = imageio.get_reader(video_fp)
     fps = video.get_meta_data()['fps']
+    import ipdb; ipdb.set_trace()
     image_np_list = [frame for frame in video]
     print("video read, num frames:", len(image_np_list))
 
@@ -78,6 +79,12 @@ if __name__ == "__main__":
     prompt_image = "fold the towel."
     video_org_fp = 'video_original.mp4'
     prompt_video = "fold the towel."
+
+    # # Data-scaling data
+    # prompt_video = "pick place mouse"
+    # assert len(prompt_video.split(" ")) > 1  # must has separate words to get object name
+    # # https://huggingface.co/datasets/Fanqi-Lin/GoPro-Raw-Videos/tree/main/pick_place_mouse/env_1/object_1
+    # video_org_fp = f"/datadrive/andyw/Data-Scaling-Laws/data/GoPro-Raw-Videos/pick_place_mouse/env_1/object_1/1.mp4"
     
-    image_example(image_org_fp, prompt_image, engine_robo_seg, engine_obj_seg, engine_bg_aug)
-    # video_example(video_org_fp, prompt_video, engine_robo_seg, engine_obj_seg, engine_bg_aug)
+    # image_example(image_org_fp, prompt_image, engine_robo_seg, engine_obj_seg, engine_bg_aug)
+    video_example(video_org_fp, prompt_video, engine_robo_seg, engine_obj_seg, engine_bg_aug)

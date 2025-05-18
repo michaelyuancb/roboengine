@@ -1,6 +1,6 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: robo_engine
-Version: 0.1
+Version: 0.0.1
 Summary: robo_engine: a plug-and-play visual robot data augmentation toolkit
 Home-page: https://github.com/michaelyuancb/robo_engine
 Author: michael_yuan
@@ -50,95 +50,126 @@ Requires-Dist: spacy
 Requires-Dist: imageio
 Requires-Dist: imageio[pyav]
 Requires-Dist: imageio[ffmpeg]
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
 
-<div align ="center">
-<h1> 🦄 RoboEngine </h1>
-<h3> Unleash the Scaling Power of Visual Robot Data Augmentation with Plug-and-Play Tools </h3>
 
-Chengbo Yuan, Shaoting Zhu, Suraj Joshi, Shengjie Wang, Hang Zhao, Yang Gao
+<h1> RoboEngine: Plug-and-Play Robot Data Augmentation with Semantic Robot Segmentation and Background Generation </h1>
 
-</div>
+**[Chengbo Yuan*](https://michaelyuancb.github.io/), [Suraj Joshi*](https://x.com/nonlinearjunkie), [Shaoting Zhu*](https://zst1406217.github.io/), [Hang Su](https://scholar.google.com/citations?user=dxN1_X0AAAAJ&hl=en), [Hang Zhao](https://hangzhaomit.github.io/), [Yang Gao](https://yang-gao.weebly.com/).**
 
-# Installation
+**[[Project Website](https://roboengine.github.io/)] [[Arxiv](https://arxiv.org/abs/2503.18738)] [[Dataset](https://huggingface.co/datasets/michaelyuanqwq/roboseg)] [[BibTex](#jump)]**
 
+RoboEngine is the first plug-and-play visual robot data augmentation toolkit (for both installation and usage). For the first time, users can effortlessly generate physics- and task-aware robot scenes with just a few lines of code. With RoboEngine, we achieve visual generalization and robustness in totally out-of-distribution scenes, with only data collecting in a single environment. Have fun !
 
-python = 3.10
+![teaser](assets/teaser_pic.png "teaser")
 
-sam2@git+https://github.com/facebookresearch/sam2.git@main # if use inpainting
+## Installation
 
-需要完善：Model Card
-https://huggingface.co/michaelyuanqwq/robo-sam
+We encapsulate RoboEngine into a plug-and-play toolkit package, you can install it simply by:
 
+```
+conda create -n roboengine python=3.10
+conda activate roboengine
+pip install -e .
+pip install en_core_web_sm-3.8.0-py3-none-any.whl
+```
+
+The model checkpoints are managed via huggingface. They will be automatically downloaded for the first time you run RoboEngine. You can also download the checkpoints and datasets manually. 
+
+|  Segmentation Dataset   | Segmentation Model  | Inpainting Model |
+|  ----  |  ----  |  ----  |
+|   [dataset link](https://huggingface.co/datasets/michaelyuanqwq/roboseg)  |  [checkpoint link](https://huggingface.co/michaelyuanqwq/roboengine-sam)  |  [checkpoint link](https://huggingface.co/michaelyuanqwq/roboengine-bg-diffusion)  |
+
+If you also want to use "inpainting" baseline method mentioned in the paper, you will also need to install SAM2 from [Meta official repository](https://github.com/facebookresearch/sam2).
 
 
 ## Quick Start
 
-Here is a script copied from ``infer_engine.py``.
+For flexibility, we decide to split RoboEngine into two segmentation and one augmentation wrappers. RoboEngine enables generative visual augmentation for robot video with only few lines. An examples is shown as below: 
 
 ```
-from utils.utils import vis_sam2_anything, refine_mask
+engine_robo_seg = RoboEngineRobotSegmentation()
+engine_obj_seg = RoboEngineObjectSegmentation()
+engine_bg_aug = RoboEngineAugmentation(aug_method='engine') 
 
-config_dir = "./cfg"
-image_path = "/root/project/robo_engine/robot_example.png"
-instruction = "pickup the cap from the kettle."
-image_np = np.array(Image.open(image_path))
+video = imageio.get_reader(video_filepath)
+instruction = "fold the towels"
+image_np_list = [frame for frame in video]
 
-########################### Robot Segmentation ################################
-robo_seg = RoboEngineRobotSegmentation(config_dir, seg_method=["robo_sam"])
-mask_robot = robo_seg.gen_image(image_np)
-mask_robot = refine_mask(mask_robot)
-Image.fromarray((mask_robot*255).astype(np.uint8)).save('mask_robot.png')
-
-########################### Object Segmentation ###############################
-obj_seg = RoboEngineObjectSegmentation(config_dir, seg_method=["evf_sam"])
-mask_obj = obj_seg.gen_image(image_np, instruction=instruction, verbose=True)
-mask_obj = refine_mask(mask_obj)
-Image.fromarray((mask_obj*255).astype(np.uint8)).save('mask_obj.png')
-
-########################### Saliency Segmentation #############################
-mask = ((mask_robot + mask_obj) > 0).astype(np.float32)
-mask = refine_mask(mask)
-Image.fromarray((mask*255).astype(np.uint8)).save('mask.png')
-np.save("mask.npy", mask)
-
-
-########################### Visual Augmentation ###############################
-
-mask = np.load("mask.npy")
-aug_method = "engine"   # selection: engine, background, inpainting, imagenet, texture, black      
-robo_engine = RoboEngineAugmentation(config_dir, aug_method=aug_method)
-aug_image = robo_engine.gen_image(image_np, mask, num_inference_steps=20, cond_scale=0.1, verbose=True)
-Image.fromarray(aug_image).save(f'aug_image_{aug_method}.png')
-
+robo_masks = engine_robo_seg.gen_video(image_np_list)
+obj_masks = engine_obj_seg.gen_video(image_np_list, instruction) 
+masks = ((robo_masks + obj_masks) > 0).astype(np.float32)
+masks_np_list = [mask for mask in masks]
+aug_video = engine_bg_aug.gen_image_batch(image_np_list, masks_np_list)
 ```
 
-## Tool Tutorial
+Run ``examples/examples.py`` for more details. The generated results should like this: 
 
-We have three modules: (1) robot segmentation, (2) object segmentation and (3) visual augmentatoin. For each module, we provide several modes for usage.
+![quick_start](assets/quick_start.png "quick_start")
 
-#### Robot Segmentation
-``` 
-robo_seg = RoboEngineRobotSegmentation(config_dir, seg_method=["robo_sam"]) 
-```
- - **["robo_sam"]**: use the finetuned EVF-SAM from RoboSeg dataset.
+## API Details
 
-#### Object Segmentation
-```
-obj_seg = RoboEngineObjectSegmentation(config_dir, seg_method=["evf_sam"])
-```
- - **["evf_sam"]**: use the multitask-version EVF-SAM.
- - **["grounding_sam"] (TODO)**: use the GroundingSAM.
- - **["gripper_sam"] (TODO)**: input the gripper position, use it as the prompt of SAM2.
+You could check the details of input parameters of ``RoboEngineRobotSegmentation``, ``RoboEngineObjectSegmentation`` and ``RoboEngineAugmentation`` in ``robo_engine/infer_engine.py``. Here are some examples:
 
-#### Visual Augmentation
 ```
-robo_engine = RoboEngineAugmentation(config_dir, aug_method="engine")
-```
- - **"engine"**: Our finetuned PBG-Diffusion for physics-realistic background generation.
- - **"background"**: Using StableDiffusion2.1 to generate a random semantic background.
- - **"inpainting"**: First use SAM2 to get several task-irrelevant area, then use StableInpainting + ControlNet-Normal to inpaint.
- - **"imagenet" (TODO)**: Copy a random image from ImageNet and then crop-resize to the shape as the background.
- - **"texture" (TODO)**: Use a random texture as the background.
- - **"black" (TODO)**: Use black background.
+# The API of object segmentation is the same with robot segmentation
+engine_robo_seg = RoboEngineRobotSegmentation()
+engine_robo_seg.gen_image(image_np, prompt="robot", preset_mask=None)
+engine_robo_seg.gen_video(image_np_list, prompt="robot", anchor_frequency=8)
 
-To reproduce previous methods: RoboAgent & CACTI with "inpainting". GreenAug with "background", "texture" and "black". RoVi-Aug with "imagenet". Some bug and sub-optimal design of the original prototype (e.g. mis-choice of the inpainting model) are fixed for performance improvement. 
+# For augmentation, we recommand: 'engine' and 'texture' mode. 
+# Also support 'imagenet', 'background', 'inpainting', 'black' mode.
+engine_bg_aug = RoboEngineAugmentation(aug_method='engine')  
+engine_bg_aug.gen_image(image_np, mask_np, 
+                        tabletop=False, 
+                        prompt=None, 
+                        num_inference_steps=5
+                        )
+engine_bg_aug.en_image_batch(image_np_list, mask_np_list, 
+                             batch_size=16, 
+                             tabletop=False,
+                             prompt=None, 
+                             num_inference_steps=5
+                             )
+```
+
+## More Resources
+
+![roboseg](assets/roboseg.png "roboseg")
+
+(1) For RoboSeg dataset download and usage, please following [this link](https://huggingface.co/datasets/michaelyuanqwq/roboseg).
+
+(2) For segmentation model training and evaluation, please first put RoboSeg dataset in some folder ${Dataset_DIR}, then:
+```
+cd robo_engine/robo_sam
+python finetune.py --mode robot --dataset_dir ${Dataset_DIR} --save_dir ${SAVE_DIR}
+python eval.py --mode robot --eval_type ${EVAL_SET} --version ${SAVE_CKPT_DIR}
+```
+
+where ${EVAL_SET} could be "test" or  "zero", meaning using test-set or zero-shot set downloaded from internet. 
+
+(3) For policy training and deployment, please refer to [Diffusion Policy](https://github.com/Fanqi-Lin/Data-Scaling-Laws/tree/master/diffusion_policy) and [DROID Platform](https://github.com/droid-dataset/droid).
+
+### Acknowledgment
+
+This repository is based on the code from [EVF-SAM](https://github.com/hustvl/EVF-SAM), [PBG-Diffusion](https://github.com/yahoo/photo-background-generation), [SKIL](https://github.com/Shengjiewang-Jason/SKIL), [ISAT-SegTool](https://github.com/yatengLG/ISAT_with_segment_anything), [GreenAug](https://github.com/eugeneteoh/greenaug), [DIL-ScalingLaw](https://github.com/Fanqi-Lin/Data-Scaling-Laws/tree/master/diffusion_policy), [GeneralFlow](https://github.com/michaelyuancb/general_flow), [DROID Platform](https://github.com/droid-dataset/droid) and [SAM2](https://github.com/facebookresearch/sam2). We sincerely appreciate their contribution to the open-source community, which have significantly supported this project.
+
+## Citation
+
+If you find this repository useful, please kindly acknowledge our work <span id="jump">:</span>
+```tex
+@article{yuan2025roboengine,
+  title={RoboEngine: Plug-and-Play Robot Data Augmentation with Semantic Robot Segmentation and Background Generation},
+  author={Yuan, Chengbo and Joshi, Suraj and Zhu, Shaoting and Su, Hang and Zhao, Hang and Gao, Yang},
+  journal={arXiv preprint arXiv:2503.18738},
+  year={2025}
+}
+```

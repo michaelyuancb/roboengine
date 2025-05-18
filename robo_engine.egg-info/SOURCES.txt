@@ -3,8 +3,6 @@ README.md
 setup.py
 robo_engine/aug_dataset.py
 robo_engine/infer_engine.py
-robo_engine/infer_engine_example.py
-robo_engine/infer_engine_org.py
 robo_engine.egg-info/PKG-INFO
 robo_engine.egg-info/SOURCES.txt
 robo_engine.egg-info/dependency_links.txt
