@@ -148,6 +148,7 @@ class EvfSam2Model(PreTrainedModel):
             beit_video_anchor,
             input_ids,
         ):
+        import ipdb; ipdb.set_trace()
         predictor = self.visual_model
         inference_state = predictor.init_state(video_path=video_path)
         predictor.reset_state(inference_state)

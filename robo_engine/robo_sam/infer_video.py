@@ -58,6 +58,7 @@ def beit3_preprocess(x: np.ndarray, img_size=224) -> torch.Tensor:
 
 
 def init_video_models(sam_version_tokenizer, sam_version, device="cuda"):
+    """Get the tokenizer and SAM model."""
     tokenizer = AutoTokenizer.from_pretrained(
         sam_version_tokenizer,
         padding_side="right",
@@ -95,7 +96,7 @@ def sam_video_infer(image_size, video,  tokenizer, model, prompt, anchor_frequen
     # (2) a directory containing (only) frames images
     # (3) a list of frames images, with ndarray format and 0~255 range. 
 
-    # preprocess
+    # preprocess: get a list of images in numpy format
     image_np_list = []
     if isinstance(video, str) and video.endswith(".mp4"):
         videos = cv2.VideoCapture(video)
@@ -119,6 +120,7 @@ def sam_video_infer(image_size, video,  tokenizer, model, prompt, anchor_frequen
     else:
         image_np_list = video
     
+    # get a list of anchors, scattered evenly
     num_frames = len(image_np_list)
     beit_video_anchor = []
     if anchor_frequency == 0:

@@ -94,8 +94,12 @@ def augment_video_util(video_fp, prompt_video, engine_robo_seg, engine_obj_seg, 
     print("video read, num frames:", len(image_np_list))
 
     # =============================== Segmentation ===============================
+    if engine_obj_seg.segmentation_cue == "points":
+        # TODO: interface with frontend to get video and labels
+        obj_masks = engine_obj_seg.gen_video_with_point_labels(image_np_list=image_np_list, labels=None) 
+    elif engine_obj_seg.segmentation_cue == "prompts":
+        obj_masks = engine_obj_seg.gen_video(image_np_list=image_np_list, instruction=prompt_video, anchor_frequency=video_anchor_frequency) 
     robo_masks = engine_robo_seg.gen_video(image_np_list=image_np_list, anchor_frequency=video_anchor_frequency)
-    obj_masks = engine_obj_seg.gen_video(image_np_list=image_np_list, instruction=prompt_video, anchor_frequency=video_anchor_frequency) 
 
     masks = ((robo_masks + obj_masks) > 0).astype(np.float32)
     if save_augmentation:
@@ -105,7 +109,6 @@ def augment_video_util(video_fp, prompt_video, engine_robo_seg, engine_obj_seg, 
 
     # =============================== Augmentation ===============================
     masks_np_list = [mask for mask in masks]
-    import ipdb; ipdb.set_trace()
     if engine_bg_aug.aug_method in ['engine', 'background', 'inpainting']:
         aug_images = engine_bg_aug.gen_image_batch(image_np_list, masks_np_list, batch_size=1, num_inference_steps=5, tabletop=True, verbose=True)
     elif engine_bg_aug.aug_method in ['texture', 'imagenet', "black"]:
@@ -120,13 +123,13 @@ def augment_video_util(video_fp, prompt_video, engine_robo_seg, engine_obj_seg, 
 
 
 class RoboEngineAugmentor:
-    def __init__(self, aug_method='engine'):
+    def __init__(self, aug_method='engine', segmentation_cue="points"):
         """Object for augment camera obs.
         
         aug_method: support both Engine and texture.
         """
         self.engine_robo_seg = RoboEngineRobotSegmentation()
-        self.engine_obj_seg = RoboEngineObjectSegmentation()
+        self.engine_obj_seg = RoboEngineObjectSegmentation(segmentation_cue="points")
         self.engine_bg_aug = RoboEngineAugmentation(aug_method=aug_method)
 
     def augment_image(self, image_org_fp: np.ndarray, prompt_image: str):

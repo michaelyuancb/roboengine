@@ -79,6 +79,12 @@ class RoboEngineRobotSegmentation:
         masks = (masks > 0).astype(np.float32)
         return masks         
 
+from enum import Enum
+
+class SegmentationCue(Enum):
+    points: str = "points"
+    prompts: str = "prompts"
+    
 
 class RoboEngineObjectSegmentation:
 
@@ -86,14 +92,26 @@ class RoboEngineObjectSegmentation:
                  sam_versoin="YxZhang/evf-sam2-multitask",
                  sam_tokenizer_version="YxZhang/evf-sam2-multitask",
                  image_size=224, 
-                 device='cuda'):    # "grounding_sam", "evf_sam", "evf_sam_video"
+                 device='cuda',
+                 hf_sam2_version_for_points_based_segmentation="facebook/sam2-hiera-large",
+                 segmentation_cue=SegmentationCue.points):    # "grounding_sam", "evf_sam", "evf_sam_video"
         self.nlp = spacy.load("en_core_web_sm")
         self.image_size = image_size
+        self.segmentation_cue = segmentation_cue
         fix_sam_fp()
-        self.obj_video_tokenizer, self.obj_video_sam = init_video_models(sam_tokenizer_version, sam_versoin, device)
+
+        if segmentation_cue == SegmentationCue.points:
+            from sam2.sam2_video_predictor import SAM2VideoPredictor
+            self.predictor = SAM2VideoPredictor.from_pretrained(hf_sam2_version_for_points_based_segmentation) 
+        else:
+            self.obj_video_tokenizer, self.obj_video_sam = init_video_models(sam_tokenizer_version, sam_versoin, device)
         print(f"Robo Engine Object Segmentation Initialized Successfully.")
 
     def gen_image(self, image_np, instruction=None, preset_mask=None, verbose=False):
+        """Generate mask on all objects detected from instruction.
+        1. detect a list of nouns
+        2. for each noun/object, infer the mask with the object guidance.
+        """
         mask = np.zeros(image_np.shape[:2])
         if instruction is not None:
             obj_instruction = extract_noun_phrases_with_adjectives(instruction, self.nlp)
@@ -131,6 +149,29 @@ class RoboEngineObjectSegmentation:
             print("#"*60)
             print("Instruction: ", instruction)
             print("Object Instruction: ", obj_instruction)
+        return masks
+    
+    def gen_video_with_point_labels(self, image_np_list, labels):
+        masks = np.zeros((1, 1, 1))
+        # TODO: get video_dir from input argument
+        from robo_engine.robo_sam.model.segment_anything_2.sam2.sam2_video_inference import get_points_and_labels, propagate_labels_through_videos_with_predictor
+        video_dir = Path("/datadrive/andyw/sam2/notebooks/videos/bedroom")
+        labels = get_points_and_labels()
+        sam2_results = propagate_labels_through_videos_with_predictor(video_dir, labels, self.predictor)
+
+        # run propagation throughout the video and collect the results in a dict
+        video_segments = {}  # video_segments contains the per-frame segmentation results
+        for out_frame_idx, out_obj_ids, out_mask_logits in sam2_results:
+            video_segments[out_frame_idx] = {
+                out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
+                for i, out_obj_id in enumerate(out_obj_ids)
+            }
+
+        n_frame_dict = len(video_segments.keys())
+        pred_mask = [video_segments[i][1][0] for i in range(n_frame_dict)]
+        vmask_obj = np.stack(pred_mask, axis=0)
+        masks = masks + vmask_obj
+        masks = (masks > 0).astype(np.float32)
         return masks
 
 

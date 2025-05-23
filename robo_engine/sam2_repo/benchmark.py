@@ -11,7 +11,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from .build_sam import build_sam2_video_predictor
+# from .build_sam import build_sam2_video_predictor
+from robo_engine.sam2_repo.build_sam import build_sam2_video_predictor
 
 # Only cuda supported
 assert torch.cuda.is_available()
